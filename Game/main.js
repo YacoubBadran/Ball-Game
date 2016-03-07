@@ -1,5 +1,23 @@
 
 var groundPos = [];
+var diamondXPos = [];
+var diamondYPos = [];
+var diamondZPos = [];
+var diamondLength = 1;
+var lengthBetweenDiamonds = diamondLength * 3;
+// Number of collectable to initialize in one row
+var minColNum = 3, maxColNum = 12;
+var groundRadius = 5;
+// Min differece between player and last collectable location
+var minDBPALCL = 20;
+// Collectable number behind the player
+var colNumBehThePlayer = 3;
+var cameraZ = 50.0;
+var colSliceNum = 0;
+var minSpaceNum = 3, maxSpaceNum = 6;
+// Number of collectable to initialize in one tunnel
+var minFillDiamonds = 20,maxFillDiamonds = 50, diamondNumLoading = 0, diamondNumToFill;
+var dimNotSpace = true;
 
 function main() {
   var canvas = document.getElementById('webgl');
@@ -10,11 +28,11 @@ function main() {
     return;
   }
 
-  var program_player = createProgram(gl, GROUND_VSHADER_SOURCE, GROUND_FSHADER_SOURCE);
+  var program_player = createProgram(gl, PLAYER_VSHADER_SOURCE, PLAYER_FSHADER_SOURCE);
   var program_ground = createProgram(gl, GROUND_VSHADER_SOURCE, GROUND_FSHADER_SOURCE);
-  var program_cyl = createProgram(gl, CYL_VSHADER_SOURCE, CYL_FSHADER_SOURCE);
-
-  if (!program_player || !program_cyl || !program_ground) {
+  var program_diamond = createProgram(gl, DIAMOND_VSHADER_SOURCE, DIAMOND_FSHADER_SOURCE);
+  var program_wall = createProgram(gl, WALL_VSHADER_SOURCE, WALL_FSHADER_SOURCE);
+  if (!program_player || !program_ground || !program_diamond || !program_wall) {
     console.log('Failed to intialize shaders.');
     return;
   }
@@ -22,95 +40,53 @@ function main() {
   gl.clearColor(0.3, 0.3, 0.3, 1.0);
   gl.enable(gl.DEPTH_TEST);
 
-  program_player.a_Position = gl.getAttribLocation(program_player, 'a_Position');
-  program_player.a_Normal = gl.getAttribLocation(program_player, 'a_Normal');
-  program_player.a_Color = gl.getAttribLocation(program_player, 'a_Color');
-  program_player.u_MvpMatrix = gl.getUniformLocation(program_player, 'u_MvpMatrix');
-  program_player.u_NormalMatrix = gl.getUniformLocation(program_player, 'u_NormalMatrix');
+	var l1 = getLocations(program_player, 'program_player', gl);
+	var l2 = getLocations(program_ground, 'program_ground', gl);
+	var l3 = getLocations(program_diamond, 'program_diamond', gl);
+	var l4 = getLocations(program_wall, 'program_wall', gl);
+	if(!l1 || !l2 || !l3 || !l4) {
+		return;
+	}
 
-  program_ground.a_Position = gl.getAttribLocation(program_ground, 'a_Position');
-  program_ground.a_Normal = gl.getAttribLocation(program_ground, 'a_Normal');
-  program_ground.a_Color = gl.getAttribLocation(program_ground, 'a_Color');
-  program_ground.u_MvpMatrix = gl.getUniformLocation(program_ground, 'u_MvpMatrix');
-  program_ground.u_NormalMatrix = gl.getUniformLocation(program_ground, 'u_NormalMatrix');
-
-  if (program_player.a_Position < 0 ||  program_player.a_Normal < 0 || program_player.a_Color < 0 ||
-      !program_player.u_MvpMatrix || !program_player.u_NormalMatrix) {
-    console.log('attribute, can not get the uniform location of program_player uniforms'); 
-    return;
-  }
-
-  if (program_ground.a_Position < 0 ||  program_ground.a_Normal < 0 || program_ground.a_Color < 0 ||
-      !program_ground.u_MvpMatrix || !program_ground.u_NormalMatrix) {
-    console.log('attribute, can not get the uniform location of program_ground uniforms'); 
-    return;
-  }
-
-/*
-  program_cyl.a_Position = gl.getAttribLocation(program_cyl, 'a_Position');
-  var u_MvpMatrix = gl.getUniformLocation(program_cyl, 'u_MvpMatrix');
-
-  if (!u_MvpMatrix) { 
-    console.log('Failed to get the storage location of u_MvpMatrix');
-    return;
-  }
-
-  var modelMatrix = new Matrix4(); // Model matrix
-  var viewMatrix = new Matrix4();  // View matrix
-  var projMatrix = new Matrix4();  // Projection matrix
-  var mvpMatrix = new Matrix4();   // Model view projection matrix
-
-  // Calculate the view matrix and the projection matrix
-  viewMatrix.setLookAt(0, 0, 20, 0, 0, 0, 0, 1, 0);
-  projMatrix.setPerspective(90, canvas.width/canvas.height, 1, 100);
-  // Calculate the model view projection matrix
-  mvpMatrix.set(projMatrix).multiply(viewMatrix);
-*/
-
-  // Prepare empty buffer objects for vertex coordinates, colors, and normals
-	var modelGround = initVertexBuffers(gl, program_ground);
-  if (!modelGround) {
-    console.log('Failed to set the vertex information in modelGround');
+	var modelGround = initBuffers(gl, program_ground, 'modelGround');
+	var modelPlayer = initBuffers(gl, program_player, 'modelPlayer');
+	var modelDiamond = initBuffers(gl, program_diamond, 'modelDiamond');
+	var modelWall = initBuffers(gl, program_wall, 'modelWall');
+  if (!modelGround || !modelPlayer || !modelDiamond || !modelWall) {
     return;
 	}
 
-  var modelPlayer = initVertexBuffers(gl, program_player);
-  if (!modelPlayer) {
-    console.log('Failed to set the vertex information in modelPlayer');
-    return;
-  }
+	var player = new Obj();
+	var ground = new Obj();
+	var diamond = new Obj();
+	var wall = new Obj();
 
-/*
-  gl.program = program_cyl;
-  var verticesNum = initVertexBuffers2(gl);
-  if (verticesNum < 0) {
-    console.log('Failed to set the vertex information');
-    return;
-  }
-
-  gl.useProgram(program_cyl);
-  // Pass the model view projection matrix
-  gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix.elements);
-*/
+  readOBJFile(player, 'objects/Ball.obj', gl, modelPlayer, 1, true);
+	readOBJFile(ground, 'objects/Cylinder.obj', gl, modelGround, 10, true);
+	// 1 * 1 * 1.5
+	readOBJFile(diamond, 'objects/diamond.obj', gl, modelDiamond, 2, true);
+	// 1 * 2 * 1
+	readOBJFile(wall, 'objects/Ball.obj', gl, modelWall, 2, true);
+	//?application/xhtml+xml
 
   var viewProjMatrix = new Matrix4();
   viewProjMatrix.setPerspective(30.0, canvas.width/canvas.height, 1.0, 5000.0);
-  viewProjMatrix.lookAt(0.0, 20.0, 50.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-
-	var player = new Obj();
-	var ground = new Obj();
-
-  readOBJFile(player, 'objects/Ball.obj', gl, modelPlayer, 2, true);
-	readOBJFile(ground, 'objects/Cylinder.obj', gl, modelGround, 10, true);
-//?application/xhtml+xml
+  viewProjMatrix.lookAt(0.0, 2.0, cameraZ, 0.0, 0.0, player.position[2], 0.0, 1.0, 0.0);
 
   var currentAngle = 0.0;
 
   document.onkeydown = function(ev){ currentAngle = keydown(ev, player, ground, program_player.u_MvpMatrix, currentAngle); };
 	groundPos.push(0.0);
 
+	diamondZPos.push(0.0); colSliceNum++;
+	var diamondXYPos = new Position(1.5);
+	diamondNumToFill = Math.floor(Math.random() * (maxFillDiamonds - minFillDiamonds + 1)) + minFillDiamonds;
+
   var tick = function() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		viewProjMatrix.setPerspective(30.0, canvas.width/canvas.height, 1.0, 5000.0);
+		viewProjMatrix.lookAt(0.0, 2.0, cameraZ, 0.0, 0.0, player.position[2], 0.0, 1.0, 0.0);
 
     gl.useProgram(program_player);
     gl.program = program_player;
@@ -136,17 +112,95 @@ function main() {
 		}
 
 ////////////////////////////////////////////////////////////////
-/*
-    gl.useProgram(program_cyl);
-    gl.program = program_cyl;
 
-    rebufferingVsAndNs(gl, program_cyl.a_Position, 3, gl.FLOAT, vertexColorbuffer); // Vertex coordinates
+    gl.useProgram(program_diamond);
+    gl.program = program_diamond;
 
-    gl.drawArrays(gl.TRIANGLES, 0, verticesNum);
-*/
+    rebufferingVsAndNs(gl, program_diamond.a_Position, 3, gl.FLOAT, modelDiamond.vertexBuffer); 
+    rebufferingVsAndNs(gl, program_diamond.a_Normal, 3, gl.FLOAT, modelDiamond.normalBuffer);
+    rebufferingIs(modelDiamond, gl);
+	
+		for(var i = 0; i < diamondZPos.length; i++) {
+			diamond.position[2] = diamondZPos[i];
+			diamond.position[0] = diamondXYPos.clock0X;
+			diamond.position[1] = diamondXYPos.clock0Y;
+			drawDiamond(diamond, gl, gl.program, 0, viewProjMatrix, modelDiamond);
+
+			diamond.position[0] = diamondXYPos.clock90X;
+			diamond.position[1] = diamondXYPos.clock90Y;
+			drawDiamond(diamond, gl, gl.program, 90, viewProjMatrix, modelDiamond);
+
+
+			diamond.position[0] = diamondXYPos.clock180X;
+			diamond.position[1] = diamondXYPos.clock180Y;
+			drawDiamond(diamond, gl, gl.program, 180, viewProjMatrix, modelDiamond);
+
+			diamond.position[0] = diamondXYPos.clock270X;
+			diamond.position[1] = diamondXYPos.clock270Y;
+			drawDiamond(diamond, gl, gl.program, 270, viewProjMatrix, modelDiamond);
+		}
+
+////////////////////////////////////////////////////////////////
+
+    gl.useProgram(program_wall);
+    gl.program = program_wall;
+
+    rebufferingVsAndNs(gl, program_wall.a_Position, 3, gl.FLOAT, modelWall.vertexBuffer); 
+    rebufferingVsAndNs(gl, program_wall.a_Normal, 3, gl.FLOAT, modelWall.normalBuffer);
+    rebufferingIs(modelWall, gl);
+
+		for(var i = 0; i < diamondZPos.length; i++) {
+			wall.position[2] = diamondZPos[i];
+			wall.position[0] = diamondXYPos.clock45X;
+			wall.position[1] = diamondXYPos.clock45Y;
+    	drawWall(wall, gl, gl.program, 45, viewProjMatrix, modelWall);
+
+			wall.position[0] = diamondXYPos.clock135X;
+			wall.position[1] = diamondXYPos.clock135Y;
+    	drawWall(wall, gl, gl.program, 135, viewProjMatrix, modelWall);
+
+
+			wall.position[0] = diamondXYPos.clock225X;
+			wall.position[1] = diamondXYPos.clock225Y;
+    	drawWall(wall, gl, gl.program, 225, viewProjMatrix, modelWall);
+
+			wall.position[0] = diamondXYPos.clock315X;
+			wall.position[1] = diamondXYPos.clock315Y;
+    	drawWall(wall, gl, gl.program, 315, viewProjMatrix, modelWall);
+		}
+
+////////////////////////////////////////////////////////////////
+
     requestAnimationFrame(tick, canvas);
   };
   tick();
 }
+
+function getLocations(program, programName, gl) {
+  program.a_Position = gl.getAttribLocation(program, 'a_Position');
+  program.a_Normal = gl.getAttribLocation(program, 'a_Normal');
+  program.a_Color = gl.getAttribLocation(program, 'a_Color');
+  program.u_MvpMatrix = gl.getUniformLocation(program, 'u_MvpMatrix');
+  program.u_NormalMatrix = gl.getUniformLocation(program, 'u_NormalMatrix');
+
+  if (program.a_Position < 0 ||  program.a_Normal < 0 || program.a_Color < 0 ||
+      !program.u_MvpMatrix || !program.u_NormalMatrix) {
+    console.log(programName + ' : can not get the uniform or attribute location of program'); 
+    return false;
+  }
+
+	return true;
+}
+
+function initBuffers(gl, program, modelName) {
+	var model = initVertexBuffers(gl, program);
+  if (!model) {
+    console.log('Failed to set the vertex information in ' + modelName);
+    return null;
+	}
+
+	return model;
+}
+
 
 
