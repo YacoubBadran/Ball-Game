@@ -1,40 +1,19 @@
 
-var Obj = function() {
-	this.g_objDoc = null;
-	this.g_drawingInfo = null;
-	this.position = new Float32Array(3);
-
-	this.g_modelMatrix = new Matrix4();
-	this.g_mvpMatrix = new Matrix4();
-	this.g_normalMatrix = new Matrix4();
-
-	this.ANGLE_STEP = 5;
-	this.theta_position = 0.0;
-}
-
-function rebufferingVsAndNs(gl, a_attribute, num, type, buffer) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-	gl.vertexAttribPointer(a_attribute, num, type, false, 0, 0);  // Assign the buffer object to the attribute variable
-	gl.enableVertexAttribArray(a_attribute);  // Enable the assignment
-}
-
-function rebufferingIs(model, gl) {
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
-}
-
-function drawPlayer(obj, gl, program, angle, viewProjMatrix, model) {
+function drawPlayer(obj, gl, program, viewProjMatrix, model) {
   if (obj.g_objDoc != null && obj.g_objDoc.isMTLComplete()){
     obj.g_drawingInfo = onReadComplete(gl, model, obj.g_objDoc);
     obj.g_objDoc = null;
   }
   if (!obj.g_drawingInfo) return;
 
-  //〈 ” translated   and   then   rotated ”  coordinates 〉 =
-  //〈 rotation   matrix 〉 × ( 〈 translation   matrix 〉 × 〈 original   coordinates 〉 ) 
-  // rotate then translate, in the program in the opposit order
-  // page 123 in the book
+ /**
+  *〈 ” translated   and   then   rotated ”  coordinates 〉 =
+  *〈 rotation   matrix 〉 × ( 〈 translation   matrix 〉 × 〈 original   coordinates 〉 ) 
+  * rotate then translate, in the program in the opposit order
+  * page 123 in the book
+	*/
   obj.g_modelMatrix.setTranslate(obj.position[0], obj.position[1], obj.position[2]);
-  obj.g_modelMatrix.rotate(angle, dirToX, 0.0, 1.0);
+  obj.g_modelMatrix.rotate(obj.angle, 0.0, 0.0, 1.0);
 
   obj.g_normalMatrix.setInverseOf(obj.g_modelMatrix);
   obj.g_normalMatrix.transpose();
@@ -67,7 +46,7 @@ function drawGround(obj, gl, program, viewProjMatrix, model) {
   gl.drawElements(gl.TRIANGLES, obj.g_drawingInfo.indices.length, gl.UNSIGNED_SHORT, 0);
 }
 
-function drawDiamond(obj, gl, program, angle, viewProjMatrix, model) {
+function drawDiamond(obj, gl, program, viewProjMatrix, model) {
   if (obj.g_objDoc != null && obj.g_objDoc.isMTLComplete()){
     obj.g_drawingInfo = onReadComplete(gl, model, obj.g_objDoc);
     obj.g_objDoc = null;
@@ -75,7 +54,7 @@ function drawDiamond(obj, gl, program, angle, viewProjMatrix, model) {
   if (!obj.g_drawingInfo) return;
 
   obj.g_modelMatrix.setTranslate(obj.position[0], obj.position[1], obj.position[2]);
-  obj.g_modelMatrix.rotate(angle, 0, 0, 1);
+  obj.g_modelMatrix.rotate(obj.angle, 0, 0, 1);
 
   obj.g_normalMatrix.setInverseOf(obj.g_modelMatrix);
   obj.g_normalMatrix.transpose();
@@ -88,7 +67,7 @@ function drawDiamond(obj, gl, program, angle, viewProjMatrix, model) {
   gl.drawElements(gl.TRIANGLES, obj.g_drawingInfo.indices.length, gl.UNSIGNED_SHORT, 0);
 }
 
-function drawWall(obj, gl, program, angle, viewProjMatrix, model) {
+function drawWall(obj, gl, program, viewProjMatrix, model) {
   if (obj.g_objDoc != null && obj.g_objDoc.isMTLComplete()){
     obj.g_drawingInfo = onReadComplete(gl, model, obj.g_objDoc);
     obj.g_objDoc = null;
@@ -96,7 +75,7 @@ function drawWall(obj, gl, program, angle, viewProjMatrix, model) {
   if (!obj.g_drawingInfo) return;
 
   obj.g_modelMatrix.setTranslate(obj.position[0], obj.position[1], obj.position[2]);
-  obj.g_modelMatrix.rotate(angle, 0, 0, 1);
+  obj.g_modelMatrix.rotate(obj.angle, 0, 0, 1);
 
   obj.g_normalMatrix.setInverseOf(obj.g_modelMatrix);
   obj.g_normalMatrix.transpose();

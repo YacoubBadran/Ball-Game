@@ -1,104 +1,144 @@
 
-var dirToX = 0.0;
+function keydown(ev) {
+	var disToMoveInZ = 2.0;
+	var thetaToMoveInXY = 2.0;
 
-function keydown(ev, player, ground, u_MvpMatrix, currentAngle) {
   switch (ev.keyCode) {
     case 38: // Up arrow key ->
-			player.position[2] -= 3.0;
-			updateZGroundPosition (player, ground);
-			updateColPos (player);
-			cameraZ -= 3.0;
+			player.position[2] -= disToMoveInZ;
+			cameraZPos -= disToMoveInZ;
+			updateGroundPos();
+			updateColPos();
+			doseTouchDmdOrWall();
       break;
     case 40: // Down arrow key ->
-      player.position[2] += 3.0;
-			cameraZ += 3.0;
+      player.position[2] += disToMoveInZ;
+			cameraZPos += disToMoveInZ;
+			doseTouchDmdOrWall();
       break;
     case 39: // Right arrow key -> 
-      player.theta_position += 3.0;
-			dirToX = 1.0;
-      currentAngle =  (currentAngle + player.ANGLE_STEP) % 360;
+      player.theta += thetaToMoveInXY;
+			doseTouchDmdOrWall();
       break;
     case 37: // Left arrow key ->
-      player.theta_position -= 3.0;
-			dirToX = -1.0;
-      currentAngle =  (currentAngle - player.ANGLE_STEP) % 360;
+      player.theta -= thetaToMoveInXY;
+			doseTouchDmdOrWall();
       break;
     default: return; // Skip drawing at no effective action
   }
 
-  player.theta_position %= 360.0;
-  var rad = (player.theta_position * Math.PI) / 180.0;
-  x = (groundRadius - 1) * Math.cos(rad); 
-  y = (groundRadius - 1) * Math.sin(rad);
-  // 1 is the radians of the player, without -1 the half player will be outside the ground.
-  player.position[0] = x;
-  player.position[1] = y;
-
-  return currentAngle;
+  player.theta %= 360.0;
+  var rad = (player.theta * Math.PI) / 180.0;
+  player.position[0] = (ground.dim[0] / 2 - player.dim[0] / 2) * Math.cos(rad);
+  player.position[1] = (ground.dim[0] / 2 - player.dim[1] / 2) * Math.sin(rad);
 }
 
-var cylNum = 1;
-function updateZGroundPosition (player, ground) {
-	if((player.position[2] / 10) * -1 >= cylNum) {
-			ground.position[2] -= 10;
-			groundPos.push(ground.position[2]);
-			cylNum++;																																	
+function updateGroundPos() {
+	while(player.position[2] - groundZPos[groundZPos.length - 1] <= distanceBetweenPlayerAndLastGround) {
+			groundZPos.push(groundZPos[groundZPos.length - 1] - ground.dim[2]);
+	}
+	
+	if(Math.abs(player.position[2] - groundZPos[0])>= distanceBetweenPlayerAndFirstGround) {
+		groundZPos = groundZPos.slice(1);
 	}
 }
 
-// Update Collectable Positions 
-function updateColPos (player) {
-	if(dimNotSpace) {
-		if(player.position[2] - diamondZPos[diamondZPos.length - 1] < minDBPALCL) {
+// Update Collectables Position
+function updateColPos() {
+	if(colNotSpace) {
+		if(player.position[2] - dmdZPos[dmdZPos.length - 1] < distanceBetweenPlayerAndLastCollectable) {
 			// Returns a random integer between min (included) and max (included)
-			var colNum = Math.floor(Math.random() * (maxColNum - minColNum + 1)) + minColNum; // Number of collectable to initialize in subtunnel
-			var sum = colNum + colSliceNum;
-			diamondZPos = diamondZPos.slice(Math.max(diamondZPos.length - ((minDBPALCL / lengthBetweenDiamonds) + colNumBehThePlayer), 0.0));
+			var colNumToInit = Math.floor(Math.random() * (maxColNum - minColNum + 1)) + minColNum; // Number of collectable to initialize in subtunnel
 
-			for(var i = colSliceNum; i < sum; i++) { // 1 is the size of collectable
-				// diamondZPos[i] = -1 * lengthBetweenDiamonds * i;
-				diamondZPos.push(-1 * lengthBetweenDiamonds * i);
+			var firstColToInit = Math.max(dmdZPos.length - (collectablesBetweenPlayerAndLastCollectable + collectablesNumBehindThePlayer), 0.0);
+
+			dmdZPos = dmdZPos.slice(firstColToInit);
+			dmdZ0Pos = dmdZ0Pos.slice(firstColToInit);
+			dmdZ90Pos = dmdZ90Pos.slice(firstColToInit);
+			dmdZ180Pos = dmdZ180Pos.slice(firstColToInit);
+			dmdZ270Pos = dmdZ270Pos.slice(firstColToInit);
+			wallZPos = wallZPos.slice(firstColToInit);
+
+			// temp : the number of collectables and spaces from the beginning of the game
+			var temp = colNumToInit + allCollectablesAndSpacesInitialized;
+			var tempArr = [];
+			for(var i = allCollectablesAndSpacesInitialized; i < temp; i++) {
+				tempArr.push(-1 * distanceBetweenTwoCol * i);
 			}
 
-			diamondNumLoading += colNum;
+			dmdZPos = dmdZPos.concat(tempArr);
+			dmdZ0Pos = dmdZ0Pos.concat(tempArr);
+			dmdZ90Pos = dmdZ90Pos.concat(tempArr);
+			dmdZ180Pos = dmdZ180Pos.concat(tempArr);
+			dmdZ270Pos = dmdZ270Pos.concat(tempArr);
 
-			if(diamondNumLoading >= diamondNumToFill) {
-				dimNotSpace = false;
-				diamondNumLoading = 0;
-				// Number of collectable to initialize in the whole next tunnel.
-				diamondNumToFill = Math.floor(Math.random() * (maxFillDiamonds - minFillDiamonds + 1)) + minFillDiamonds;
-			}
-	//console.log(diamondZPos);
-			colSliceNum = sum;
+			wallZPos = wallZPos.concat(tempArr);
+
+			allCollectablesAndSpacesInitialized = temp;
+			colNotSpace = false;
 		}
 	}
 	else {
 		var spaceNum = Math.floor(Math.random() * (maxSpaceNum - minSpaceNum + 1)) + minSpaceNum; // Number of spaces to initialize
-		colSliceNum += spaceNum;
-		dimNotSpace = true;
+		allCollectablesAndSpacesInitialized += spaceNum;
+		colNotSpace = true;
 	}
 }
 
-var Position = function(objRadius) {
-	this.rad = Math.PI / 180.0;
-this.a = 10;
-  // 1 is the radians of the collectable, without -1 the half collectable will be outside the ground.
-  this.clock0X = (groundRadius - objRadius) * Math.cos(0);
-	this.clock0Y = (groundRadius - objRadius) * Math.sin(0);
-  this.clock45X = (groundRadius - objRadius) * Math.cos(this.rad * 45);
-	this.clock45Y = (groundRadius - objRadius) * Math.sin(this.rad * 45);
-  this.clock90X = (groundRadius - objRadius) * Math.cos(this.rad * 90);
-	this.clock90Y = (groundRadius - objRadius) * Math.sin(this.rad * 90);
-  this.clock135X = (groundRadius - objRadius) * Math.cos(this.rad * 135);
-	this.clock135Y = (groundRadius - objRadius) * Math.sin(this.rad * 135);
-  this.clock180X = (groundRadius - objRadius) * Math.cos(this.rad * 180);
-	this.clock180Y = (groundRadius - objRadius) * Math.sin(this.rad * 180);
-  this.clock225X = (groundRadius - objRadius) * Math.cos(this.rad * 225);
-	this.clock225Y = (groundRadius - objRadius) * Math.sin(this.rad * 225);
-  this.clock270X = (groundRadius - objRadius) * Math.cos(this.rad * 270);
-	this.clock270Y = (groundRadius - objRadius) * Math.sin(this.rad * 270);
-  this.clock315X = (groundRadius - objRadius) * Math.cos(this.rad * 315);
-	this.clock315Y = (groundRadius - objRadius) * Math.sin(this.rad * 315);
+function doseTouchDmdOrWall() { 
+////////////////////////////////////////////////////////////////
+// Touch collectable
+
+	if (player.position[0] <= xDistancePlayerDiamondCenters && player.position[0] >= -1 * xDistancePlayerDiamondCenters) { // |
+		if (player.position[1] > 0) { // Above
+			touchRowDmd(dmdZ90Pos, player);
+		} else { // Below
+			touchRowDmd(dmdZ270Pos, player);
+		}
+	} else {
+		if (player.position[1] <= yDistancePlayerDiamondCenters && player.position[1] >= -1 * yDistancePlayerDiamondCenters) { // ___
+			if (player.position[0] > 0) { // Right
+				touchRowDmd(dmdZ0Pos, player);
+			} else { // Left
+				touchRowDmd(dmdZ180Pos, player);
+			}
+		}
+	}
+
+////////////////////////////////////////////////////////////////
+// Touch wall
+
+	var playerTheta = Math.abs(player.theta);
+
+	if((playerTheta >= playerThetaToTouchTheWall.thetaB45 && playerTheta <= playerThetaToTouchTheWall.thetaA45) || 
+		(playerTheta >= playerThetaToTouchTheWall.thetaB135 && playerTheta <= playerThetaToTouchTheWall.theraA135) || 
+		(playerTheta >= playerThetaToTouchTheWall.thetaB225 && playerTheta <= playerThetaToTouchTheWall.theraA225) || 
+		(playerTheta >= playerThetaToTouchTheWall.thetaB315 && playerTheta <= playerThetaToTouchTheWall.theraA315)) {
+		/**
+		 * Replace the loop with function to check 'Game Over' with constant time.
+		 * wallZPos.splice(i, (player.position[2] - wallZPos[0]) / number);
+		 */
+		for(var i = 0; i < wallZPos.length; i++) {
+			if(Math.abs(player.position[2] - wallZPos[i]) <= zDistancePlayerWallCenters) {
+				console.log('Game Over!');
+			}
+		}
+	}
+}
+
+function touchRowDmd(row) {
+	/**
+	 * Replace the loop with function to get the diamond with constant time.
+	 * row.splice(i, (player.position[2] - row[0]) / distanceBetweenTwoCol);
+	 */
+	for(var i = 0; i < row.length; i++) {
+		if(row[i] != null && Math.abs(player.position[2] - row[i]) <= zDistancePlayerDiamondCenters) {
+			//row.splice(i, 1); I delete it because "null" is better and keep the size of the array, if I not delete it there will be many falts in
+			//slice method of an array to delete the collectable behind the player.
+			row[i] = null;
+			break; // Because the player can not touch tow diamond at the same time.
+		}
+	}
 }
 
 var last = Date.now(); // Last time that this function was called

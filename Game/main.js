@@ -1,25 +1,6 @@
 
-var groundPos = [];
-var diamondXPos = [];
-var diamondYPos = [];
-var diamondZPos = [];
-var diamondLength = 1;
-var lengthBetweenDiamonds = diamondLength * 3;
-// Number of collectable to initialize in one row
-var minColNum = 3, maxColNum = 12;
-var groundRadius = 5;
-// Min differece between player and last collectable location
-var minDBPALCL = 20;
-// Collectable number behind the player
-var colNumBehThePlayer = 3;
-var cameraZ = 50.0;
-var colSliceNum = 0;
-var minSpaceNum = 3, maxSpaceNum = 6;
-// Number of collectable to initialize in one tunnel
-var minFillDiamonds = 20,maxFillDiamonds = 50, diamondNumLoading = 0, diamondNumToFill;
-var dimNotSpace = true;
-
 function main() {
+
   var canvas = document.getElementById('webgl');
 
   var gl = getWebGLContext(canvas);
@@ -56,37 +37,34 @@ function main() {
     return;
 	}
 
-	var player = new Obj();
-	var ground = new Obj();
-	var diamond = new Obj();
-	var wall = new Obj();
+	var groundRadius = 5; // ground radius
+	var groundDiameter = groundRadius * 2;
 
-  readOBJFile(player, 'objects/Ball.obj', gl, modelPlayer, 1, true);
+	player = new Obj(2, 2, 2, groundRadius); player.theta = 0.0;
+	ground = new Obj(groundDiameter, groundDiameter, groundDiameter, groundRadius);
+	diamond = new Obj(2, 2, 3, groundRadius);
+	wall = new Obj(2, 4, 2.5, groundRadius);
+
+  readOBJFile(player, 'objects/Ball.obj', gl, modelPlayer, 2, true);
 	readOBJFile(ground, 'objects/Cylinder.obj', gl, modelGround, 10, true);
-	// 1 * 1 * 1.5
 	readOBJFile(diamond, 'objects/diamond.obj', gl, modelDiamond, 2, true);
-	// 1 * 2 * 1
 	readOBJFile(wall, 'objects/Ball.obj', gl, modelWall, 2, true);
-	//?application/xhtml+xml
 
   var viewProjMatrix = new Matrix4();
   viewProjMatrix.setPerspective(30.0, canvas.width/canvas.height, 1.0, 5000.0);
-  viewProjMatrix.lookAt(0.0, 2.0, cameraZ, 0.0, 0.0, player.position[2], 0.0, 1.0, 0.0);
+  viewProjMatrix.lookAt(0.0, 2.0, cameraZPos, 0.0, 0.0, player.position[2], 0.0, 1.0, 0.0);
 
-  var currentAngle = 0.0;
+	initializeSomeGlobalVariables();
 
-  document.onkeydown = function(ev){ currentAngle = keydown(ev, player, ground, program_player.u_MvpMatrix, currentAngle); };
-	groundPos.push(0.0);
-
-	diamondZPos.push(0.0); colSliceNum++;
-	var diamondXYPos = new Position(1.5);
-	diamondNumToFill = Math.floor(Math.random() * (maxFillDiamonds - minFillDiamonds + 1)) + minFillDiamonds;
+  document.onkeydown = function(ev){ keydown(ev); };
 
   var tick = function() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+////////////////////////////////////////////////////////////////
+// Draw player
 		viewProjMatrix.setPerspective(30.0, canvas.width/canvas.height, 1.0, 5000.0);
-		viewProjMatrix.lookAt(0.0, 2.0, cameraZ, 0.0, 0.0, player.position[2], 0.0, 1.0, 0.0);
+		viewProjMatrix.lookAt(0.0, 2.0, cameraZPos, 0.0, 0.0, player.position[2], 0.0, 1.0, 0.0);
 
     gl.useProgram(program_player);
     gl.program = program_player;
@@ -95,10 +73,11 @@ function main() {
     rebufferingVsAndNs(gl, program_player.a_Normal, 3, gl.FLOAT, modelPlayer.normalBuffer);
     rebufferingIs(modelPlayer, gl);
 
-    drawPlayer(player, gl, gl.program, currentAngle, viewProjMatrix, modelPlayer);
+		player.angle = 0;
+    drawPlayer(player, gl, gl.program, viewProjMatrix, modelPlayer);
 
 ////////////////////////////////////////////////////////////////
-
+// Draw grounds
     gl.useProgram(program_ground);
     gl.program = program_ground;
 
@@ -106,42 +85,27 @@ function main() {
     rebufferingVsAndNs(gl, program_ground.a_Normal, 3, gl.FLOAT, modelGround.normalBuffer);
     rebufferingIs(modelGround, gl);
 
-		for(var i = 0; i < groundPos.length; i++) {
-			ground.position[2] = groundPos[i];
+		for(var i = 0; i < groundZPos.length; i++) {
+			ground.position[2] = groundZPos[i];
 			drawGround(ground, gl, gl.program, viewProjMatrix, modelGround);
 		}
 
 ////////////////////////////////////////////////////////////////
-
+// Draw diamonds
     gl.useProgram(program_diamond);
     gl.program = program_diamond;
 
     rebufferingVsAndNs(gl, program_diamond.a_Position, 3, gl.FLOAT, modelDiamond.vertexBuffer); 
     rebufferingVsAndNs(gl, program_diamond.a_Normal, 3, gl.FLOAT, modelDiamond.normalBuffer);
     rebufferingIs(modelDiamond, gl);
-	
-		for(var i = 0; i < diamondZPos.length; i++) {
-			diamond.position[2] = diamondZPos[i];
-			diamond.position[0] = diamondXYPos.clock0X;
-			diamond.position[1] = diamondXYPos.clock0Y;
-			drawDiamond(diamond, gl, gl.program, 0, viewProjMatrix, modelDiamond);
 
-			diamond.position[0] = diamondXYPos.clock90X;
-			diamond.position[1] = diamondXYPos.clock90Y;
-			drawDiamond(diamond, gl, gl.program, 90, viewProjMatrix, modelDiamond);
-
-
-			diamond.position[0] = diamondXYPos.clock180X;
-			diamond.position[1] = diamondXYPos.clock180Y;
-			drawDiamond(diamond, gl, gl.program, 180, viewProjMatrix, modelDiamond);
-
-			diamond.position[0] = diamondXYPos.clock270X;
-			diamond.position[1] = diamondXYPos.clock270Y;
-			drawDiamond(diamond, gl, gl.program, 270, viewProjMatrix, modelDiamond);
-		}
+		drawRowDmd(diamond, gl, gl.program, 0, viewProjMatrix, modelDiamond, diamond.xYPos.clock0X, diamond.xYPos.clock0Y, dmdZ0Pos);
+		drawRowDmd(diamond, gl, gl.program, 90, viewProjMatrix, modelDiamond, diamond.xYPos.clock90X, diamond.xYPos.clock90Y, dmdZ90Pos);
+		drawRowDmd(diamond, gl, gl.program, 180, viewProjMatrix, modelDiamond, diamond.xYPos.clock180X, diamond.xYPos.clock180Y, dmdZ180Pos);
+		drawRowDmd(diamond, gl, gl.program, 270, viewProjMatrix, modelDiamond, diamond.xYPos.clock270X, diamond.xYPos.clock270Y, dmdZ270Pos);
 
 ////////////////////////////////////////////////////////////////
-
+// Draw walls
     gl.useProgram(program_wall);
     gl.program = program_wall;
 
@@ -149,25 +113,10 @@ function main() {
     rebufferingVsAndNs(gl, program_wall.a_Normal, 3, gl.FLOAT, modelWall.normalBuffer);
     rebufferingIs(modelWall, gl);
 
-		for(var i = 0; i < diamondZPos.length; i++) {
-			wall.position[2] = diamondZPos[i];
-			wall.position[0] = diamondXYPos.clock45X;
-			wall.position[1] = diamondXYPos.clock45Y;
-    	drawWall(wall, gl, gl.program, 45, viewProjMatrix, modelWall);
-
-			wall.position[0] = diamondXYPos.clock135X;
-			wall.position[1] = diamondXYPos.clock135Y;
-    	drawWall(wall, gl, gl.program, 135, viewProjMatrix, modelWall);
-
-
-			wall.position[0] = diamondXYPos.clock225X;
-			wall.position[1] = diamondXYPos.clock225Y;
-    	drawWall(wall, gl, gl.program, 225, viewProjMatrix, modelWall);
-
-			wall.position[0] = diamondXYPos.clock315X;
-			wall.position[1] = diamondXYPos.clock315Y;
-    	drawWall(wall, gl, gl.program, 315, viewProjMatrix, modelWall);
-		}
+		drawRowWall(wall, gl, gl.program, 45, viewProjMatrix, modelWall, wall.xYPos.clock45X, wall.xYPos.clock45Y, wallZPos);
+		drawRowWall(wall, gl, gl.program, 135, viewProjMatrix, modelWall, wall.xYPos.clock135X, wall.xYPos.clock135Y, wallZPos);
+		drawRowWall(wall, gl, gl.program, 225, viewProjMatrix, modelWall, wall.xYPos.clock225X, wall.xYPos.clock225Y, wallZPos);
+		drawRowWall(wall, gl, gl.program, 315, viewProjMatrix, modelWall, wall.xYPos.clock315X, wall.xYPos.clock315Y, wallZPos);
 
 ////////////////////////////////////////////////////////////////
 
@@ -175,32 +124,4 @@ function main() {
   };
   tick();
 }
-
-function getLocations(program, programName, gl) {
-  program.a_Position = gl.getAttribLocation(program, 'a_Position');
-  program.a_Normal = gl.getAttribLocation(program, 'a_Normal');
-  program.a_Color = gl.getAttribLocation(program, 'a_Color');
-  program.u_MvpMatrix = gl.getUniformLocation(program, 'u_MvpMatrix');
-  program.u_NormalMatrix = gl.getUniformLocation(program, 'u_NormalMatrix');
-
-  if (program.a_Position < 0 ||  program.a_Normal < 0 || program.a_Color < 0 ||
-      !program.u_MvpMatrix || !program.u_NormalMatrix) {
-    console.log(programName + ' : can not get the uniform or attribute location of program'); 
-    return false;
-  }
-
-	return true;
-}
-
-function initBuffers(gl, program, modelName) {
-	var model = initVertexBuffers(gl, program);
-  if (!model) {
-    console.log('Failed to set the vertex information in ' + modelName);
-    return null;
-	}
-
-	return model;
-}
-
-
 
