@@ -17,16 +17,21 @@ var wallZPos = [0.0];
 
 var colNotSpace = true;
 
+var last = Date.now(); // Last time updatePlayerPos() function was called
+
 var xDistancePlayerDiamondCenters;
 var yDistancePlayerDiamondCenters;
 var zDistancePlayerDiamondCenters;
 
 var xDistancePlayerWallCenters;
 var zDistancePlayerWallCenters;
-var playerThetaToTouchTheWall; // object initialized at main function
+var playerThetaToTouchTheWall; // Is an object
 
 ////////////////////////////////////////////////////////////////
 // Game Control Panel.
+
+var playerSpeedZ = 50; // Units in second
+var playerSpeedXY = 0.5; // Units in one key press
 
 var cameraZPos = 40.0;
 

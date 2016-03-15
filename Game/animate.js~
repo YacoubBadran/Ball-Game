@@ -1,5 +1,6 @@
 
 function keydown(ev) {
+
   switch (ev.keyCode) {
 		case 39: // Right arrow key -> 
       player.theta += player.speedTheta;
